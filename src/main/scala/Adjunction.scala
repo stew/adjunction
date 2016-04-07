@@ -16,8 +16,8 @@ abstract class Adjunction[F[_], G[_]] { self =>
   /**
    * given any two adjoint functors, we can create a monad of their composite
    */
-  def monad(implicit G: Functor[G]): Monad[({type λ[α] = G[F[α]]})#λ] =
-    new Monad[({type λ[α] = G[F[α]]})#λ] {
+  def monad(implicit G: Functor[G]): Monad[λ[α => G[F[α]]]] =
+    new Monad[λ[α => G[F[α]]]] {
       def pure[A](a: A) = unit(a)
       def flatMap[A,B](gfa: G[F[A]])(f: A => G[F[B]]): G[F[B]] =
       G.map(gfa)(right(_)(f))
@@ -26,8 +26,8 @@ abstract class Adjunction[F[_], G[_]] { self =>
   /**
    * given any two adjoint functors, we can create a comonad of their composite
    */
-  def comonad(implicit F: Functor[F]): Comonad[({type λ[α] = F[G[α]]})#λ] =
-    new Comonad[({type λ[α] = F[G[α]]})#λ] {
+  def comonad(implicit F: Functor[F]): Comonad[λ[α => F[G[α]]]] =
+    new Comonad[λ[α => F[G[α]]]] {
       def extract[A](fga: F[G[A]]): A = counit(fga)
       def map[A,B](fga: F[G[A]])(f: A => B): F[G[B]] =
         coflatMap(fga)(a => f(counit(a)))
@@ -39,9 +39,9 @@ abstract class Adjunction[F[_], G[_]] { self =>
    * we can compose one adjunction with another
    */
   def compose[H[_], I[_]](HI: Adjunction[H, I]):
-      Adjunction[({type λ[α] = H[F[α]]})#λ, ({type λ[α] = G[I[α]]})#λ] = {
+      Adjunction[λ[α => H[F[α]]], λ[α => G[I[α]]]] = {
 
-    new Adjunction[({type λ[α] = H[F[α]]})#λ, ({type λ[α] = G[I[α]]})#λ] {
+    new Adjunction[λ[α => H[F[α]]], λ[α => G[I[α]]]] {
 
       def left[A,B](a: A)(f: H[F[A]] => B): G[I[B]] = 
         self.left(a)(HI.left(_)(f))
