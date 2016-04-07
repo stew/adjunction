@@ -29,8 +29,10 @@ abstract class Adjunction[F[_], G[_]] { self =>
   def comonad(implicit F: Functor[F]): Comonad[λ[α => F[G[α]]]] =
     new Comonad[λ[α => F[G[α]]]] {
       def extract[A](fga: F[G[A]]): A = counit(fga)
+
       def map[A,B](fga: F[G[A]])(f: A => B): F[G[B]] =
         coflatMap(fga)(a => f(counit(a)))
+
       def coflatMap[A,B](fga: F[G[A]])(f: F[G[A]] => B): F[G[B]] =
         F.map(fga)(left(_)(f))
     }

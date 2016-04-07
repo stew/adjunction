@@ -7,14 +7,6 @@ object ComposedState {
   type State[S,A] = S => (S, A)
   type Stateful[S, A, B] = A => State[S,B]
 
-  sealed trait StateComputation[S, A, B]
-
-  final case class ||:[S,A,B,SS,BB, C, T <: StateComputation[SS,A,BB]](run: Stateful[S,A,B], f: (B, BB) => C) extends StateComputation[(S,SS), A, C]
-
-  final case class |>:[S,A,B,SS,C,T <: StateComputation[SS,C,A]](run: Stateful[S,A,B]) extends StateComputation[(S, SS), C, B]
-
-  sealed trait PSNil extends StateComputation[HNil, Any, HNil]
-
   def writerReader[S]: Adjunction[(S,?), S => ?] =
     new Adjunction[(S,?), S => ?] {
       def left[A, B](a: A)(f: ((S, A)) => B): S => B = s => f((s,a))
