@@ -7,8 +7,8 @@ object ComposedState {
   type State[S,A] = S => (S, A)
   type Stateful[S, A, B] = A => State[S,B]
 
-  def writerReader[S]: Adjunction[(S,?), S => ?] =
-    new Adjunction[(S,?), S => ?] {
+  def writerReader[S]: (S, ?) ⊣ (S => ?) =
+    new ((S,?) ⊣ (S => ?)) {
       def left[A, B](a: A)(f: ((S, A)) => B): S => B = s => f((s,a))
       def right[A,B](sa: (S,A))(f: A => S => B): B = f(sa._2)(sa._1)
     }
