@@ -1,17 +1,18 @@
 package adjunction
 
-import shapeless._
 import cats._
 
 object ComposedState {
-  type State[S,A] = S => (S, A)
-  type Stateful[S, A, B] = A => State[S,B]
+  import Adjunction._
+  /**
+   * Coreader ⊣ Reader gives rise to a monad when composed as `α =>
+   * Reader[S, Writer[S, α]], and the Monad is for `s => (s, α)` which
+   * looks just like the state Monad!
+   */
 
-  def writerReader[S]: (S, ?) ⊣ (S => ?) =
-    new ((S,?) ⊣ (S => ?)) {
-      def left[A, B](a: A)(f: ((S, A)) => B): S => B = s => f((s,a))
-      def right[A,B](sa: (S,A))(f: A => S => B): B = f(sa._2)(sa._1)
-    }
+  type State[S,A] = Reader[S, Coreader[S, A]] // = S => (S,A)
+
+  type Stateful[S, A, B] = A => State[S,B]
 
   type ComposedState[S1,S2,A] = S1 => (S2 => (S2, (S1, A)))
 
@@ -24,13 +25,13 @@ object ComposedState {
       override def map[A,B](fa: S1 => (S2 => A))(f: A => B) = s1 => s2 => f(fa(s1)(s2))
     }
 
-    (writerReader[S1].compose[(S2,?), S2 => ?](writerReader[S2])).monad
+    coreaderReader[S1].compose[(S2,?), S2 => ?](coreaderReader[S2]).monad
   }
 
   /**
-   * combine two A => S => (S,B) functions that perfom stateful
-   * computation on As such that a structure of As can be traversed
-   * once doing both computations.
+   * combine two Stateful functions that perfom As such that a
+   * structure of As can be traversed once doing both computations in
+   * parallel, then combining their results with a gi
    */
   def twoInParallel[A,S1,S2,B,C,R](sf1: Stateful[S1,A,B],
                                    sf2: Stateful[S2,A,C],
@@ -43,8 +44,8 @@ object ComposedState {
 
 
   /**
-   * combine an A => S1 => (S1,B) with a B => S2 => (S2, B) so that
-   * one traversal of As can compute a C, using both stateful
+   * combine an Stateful[S1, A, B] with a Stateful[S2, B, C] so that
+   * one traversal of As can compute a C, using both stateful serially
    * computations.
    */
   def feedOneAnother[A, S1, S2, B, C](sf1: Stateful[S1,A,B],
