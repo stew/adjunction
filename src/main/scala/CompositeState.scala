@@ -14,18 +14,15 @@ object ComposedState {
 
   type Stateful[S, A, B] = A => State[S,B]
 
-  type ComposedState[S1,S2,A] = S1 => (S2 => (S2, (S1, A)))
+  type ComposedState[S1,S2,A] = Reader[S1,Reader[S2, Coreader[S2,Coreader[S1, A]]]] // S1 => (S2 => (S2, (S1, A)))
 
   def composeAdjMonad[S1,S2]: Monad[ComposedState[S1,S2, ?]] = {
 //  Functor#compose seems to be broken in cats because it conflicts with Invariant#compose
-//    val f1: Functor[S1 => ?] = cats.std.function.function1Covariant
-//    val f2: Functor[S2 => ?] = cats.std.function.function1Covariant
-//    implicit val f3: Functor[({type λ[α] = S1 => (S2 => α)})#λ] = f1.compose(f2)
-    implicit val f3 = new Functor[({type λ[α] = S1 => (S2 => α)})#λ] {
-      override def map[A,B](fa: S1 => (S2 => A))(f: A => B) = s1 => s2 => f(fa(s1)(s2))
+    implicit val f3 = new Functor[λ[α => Reader[S1,Reader[S2,α]]]] {
+      override def map[A,B](fa: Reader[S1, Reader[S2, A]])(f: A => B) = s1 => s2 => f(fa(s1)(s2))
     }
 
-    coreaderReader[S1].compose[(S2,?), S2 => ?](coreaderReader[S2]).monad
+    coreaderReader[S1].compose[Coreader[S2,?], Reader[S2,?]](coreaderReader[S2]).monad
   }
 
   /**
