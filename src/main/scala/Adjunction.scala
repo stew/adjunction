@@ -29,9 +29,11 @@ import cats._
  * This gives rise to two functions:
  *
  *   - `left`:  ⎡⎤ => ⎣⎦ 
-
+ * 
  *   - `right`: ⎣⎦ => ⎡⎤ 
  * 
+ * Stating: given any right adjunct, I can product a left adjunct, and
+ * given any left adjuct, I can product a right adjunt
  *
  * ⎡ | 0x23A1 | (C-x 8 ENTER) LEFT SQUARE BRACKET UPPER CORNER
 
@@ -61,19 +63,19 @@ abstract class Adjunction[F[_], G[_]] { self =>
   def right[A,B](fa: A ⎣⎦ B): A ⎡⎤ B
 
   /**
-   * Wrap an A into a G[F[A] context. This is the `pure` operation of
+   * Wrap an A into a G[F[A]] context. This is the `pure` operation of
    * the monad for G[F[?]] which arises from this adjunction.
    */ 
   def unit[A]: A => G[F[A]] = left(identity[F[A]])
 
   /**
    * Extract an A from a F[G[A]. This is the `copure` operation of the 
-   *  comonad for F[G[A]] that which from this adjunction
+   *  comonad for F[G[A]] which arises from this adjunction.
    */
   def counit[A]: F[G[A]] => A = right(identity[G[A]])
 
   /**
-   * given any two adjoint functors, we can create a monad of their composite
+   * given any two adjoint functors, we can create a monad of their composite.
    */
   def monad(implicit G: Functor[G]): Monad[λ[α => G[F[α]]]] =
     new Monad[λ[α => G[F[α]]]] {
@@ -86,18 +88,24 @@ abstract class Adjunction[F[_], G[_]] { self =>
       override def flatMap[A,B](gfa: G[F[A]])(f: A => G[F[B]]): G[F[B]] =
         G.map(gfa)(right(f))
 
-      /**
-       * this is not actually tail recursive, but I'm not sure that's possible
-       */
-      override def tailRecM[A, B](a: A)(f: A => G[F[scala.Either[A, B]]]): G[F[B]] =
-        flatMap(f(a)) {
-          case scala.Left(a) => tailRecM(a)(f)
-          case scala.Right(b) => unit(b)
+      override def tailRecM[A, B](a: A)(f: A => G[F[scala.Either[A, B]]]): G[F[B]] = {
+        lazy val mapFn: F[Either[A, B]] => Eval[F[B]] = right(run)
+
+        def feval(a: A): G[Eval[F[B]]] =
+          G.map(f(a)) { fe => Eval.later(fe).flatMap(mapFn) }
+
+        lazy val run: Either[A, B] => G[Eval[F[B]]] = {
+          case Right(b) => G.map(pure(b))(Eval.now)
+          case Left(a) => feval(a)
         }
+
+
+        G.map(f(a)) { fe => mapFn(fe).value }
+      }
     }
 
   /**
-   * given any two adjoint functors, we can create a comonad of their composite
+   * Given any two adjoint functors, we can create a comonad of their composite.
    */
   def comonad(implicit F: Functor[F]): Comonad[λ[α => F[G[α]]]] =
     new Comonad[λ[α => F[G[α]]]] {
@@ -111,7 +119,7 @@ abstract class Adjunction[F[_], G[_]] { self =>
     }
 
   /**
-   * we can compose one adjunction with another
+   * We can compose one adjunction with another.
    */
   def compose[H[_], I[_]](HI: H ⊣ I): Adjunction[λ[α => H[F[α]]], λ[α => G[I[α]]]] =
     new Adjunction[λ[α => H[F[α]]], λ[α => G[I[α]]]] {
@@ -129,7 +137,6 @@ abstract class Adjunction[F[_], G[_]] { self =>
 object Adjunction {
 
   type Reader[S,R] = S => R
-
   type Coreader[S,R] = (S,R)
 
   def idid[A]: (Id ⊣ Id) =
